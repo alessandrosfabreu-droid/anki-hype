@@ -1,32 +1,50 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}.lockwrap{position:fixed;inset:0;z-index:99999;background:#fff;display:flex;align-items:center;justify-content:center;padding:24px}.lockbox{width:100%;max-width:320px;text-align:center}.lockbox h1{font-size:18px;margin:0 0 4px}.lockbox p{font-size:13px;color:#666;margin:0 0 20px}.lockbox input{width:100%;box-sizing:border-box;padding:12px 14px;font-size:16px;border:1px solid #ccc;border-radius:10px;margin-bottom:10px}.lockbox button{width:100%;padding:12px 14px;font-size:15px;font-weight:600;border:0;border-radius:10px;background:#111;color:#fff}.lockbox .lockerr{color:#c0392b;font-size:13px;min-height:18px;margin-top:8px}body.hype-locked>*:not(#lockscreen){display:none!important}</style></head><body class="hype-locked">
-<div id="lockscreen" class="lockwrap"><div class="lockbox"><h1>Anki Hype</h1><p>Área restrita — Condomínio Clube Hype</p><input id="lockpw" type="password" inputmode="text" placeholder="Senha de acesso" autocomplete="off"><button id="lockbtn" type="button">Entrar</button><p class="lockerr" id="lockerr"></p></div></div>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}.lockwrap{position:fixed;inset:0;z-index:99999;background:#fff;display:flex;align-items:center;justify-content:center;padding:24px}.lockbox{width:100%;max-width:320px;text-align:center}.lockbox h1{font-size:18px;margin:0 0 4px}.lockbox p{font-size:13px;color:#666;margin:0 0 20px}.lockbox input{width:100%;box-sizing:border-box;padding:12px 14px;font-size:16px;border:1px solid #ccc;border-radius:10px;margin-bottom:10px}.lockbox button{width:100%;padding:12px 14px;font-size:15px;font-weight:600;border:0;border-radius:10px;background:#111;color:#fff}.lockbox .lockerr{color:#c0392b;font-size:13px;min-height:18px;margin-top:8px}.lockbox .lockhint{font-size:12px;color:#999;margin-top:14px}body.hype-locked>*:not(#lockscreen){display:none!important}</style></head><body class="hype-locked">
+<div id="lockscreen" class="lockwrap"><div class="lockbox"><h1>Anki Hype</h1><p>Área restrita — Condomínio Clube Hype</p><input id="lockemail" type="email" placeholder="E-mail" autocomplete="username"><input id="lockpw" type="password" placeholder="Senha" autocomplete="current-password"><button id="lockbtn" type="button">Entrar</button><p class="lockerr" id="lockerr"></p></div></div>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
+window.__ankiReady = new Promise(function (resolve) { window.__ankiResolve = resolve; });
 (function(){
-  var HASH = 'bb0366788640705bd505435fba9402d8287e86403bff8e847d2dbdf003531ae7';
-  var LS = 'anki-hype:auth';
-  async function sha256hex(s){
-    var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
-    return Array.prototype.map.call(new Uint8Array(buf), function(b){ return b.toString(16).padStart(2,'0'); }).join('');
-  }
-  function unlock(){
+  var firebaseConfig = {
+    apiKey: "AIzaSyCKJqu118OALWO0AeTSIm_uvM9QBQuMuvg",
+    authDomain: "anki-hype.firebaseapp.com",
+    projectId: "anki-hype",
+    storageBucket: "anki-hype.firebasestorage.app",
+    messagingSenderId: "885622730342",
+    appId: "1:885622730342:web:c43df510e02585437987a7"
+  };
+  firebase.initializeApp(firebaseConfig);
+  var auth = firebase.auth();
+  var errEl, btnEl;
+  function unlock(uid){
     document.getElementById('lockscreen').remove();
     document.body.classList.remove('hype-locked');
+    window.__ankiResolve({ uid: uid, db: firebase.firestore() });
   }
-  try {
-    if (localStorage.getItem(LS) === HASH) { unlock(); }
-  } catch (e) {}
-  document.getElementById('lockbtn').addEventListener('click', tryUnlock);
-  document.getElementById('lockpw').addEventListener('keydown', function(e){ if (e.key === 'Enter') tryUnlock(); });
-  async function tryUnlock(){
+  function fail(msg){
+    errEl.textContent = msg;
+    btnEl.disabled = false; btnEl.textContent = 'Entrar';
+  }
+  function tryLogin(){
+    var email = (document.getElementById('lockemail').value || '').trim();
     var pw = document.getElementById('lockpw').value || '';
-    var h = await sha256hex(pw);
-    if (h === HASH) {
-      try { localStorage.setItem(LS, HASH); } catch (e) {}
-      unlock();
-    } else {
-      document.getElementById('lockerr').textContent = 'Senha incorreta.';
-    }
+    errEl.textContent = '';
+    if (!email || !pw) { fail('Preencha e-mail e senha.'); return; }
+    btnEl.disabled = true; btnEl.textContent = 'Entrando…';
+    auth.signInWithEmailAndPassword(email, pw).catch(function (e) {
+      var msgs = { 'auth/invalid-email': 'E-mail inválido.', 'auth/user-not-found': 'Usuário não encontrado.', 'auth/wrong-password': 'Senha incorreta.', 'auth/invalid-credential': 'E-mail ou senha incorretos.', 'auth/too-many-requests': 'Muitas tentativas. Aguarde um pouco.' };
+      fail(msgs[e.code] || 'Não foi possível entrar.');
+    });
   }
+  document.addEventListener('DOMContentLoaded', function () {
+    errEl = document.getElementById('lockerr'); btnEl = document.getElementById('lockbtn');
+    btnEl.addEventListener('click', tryLogin);
+    ['lockemail', 'lockpw'].forEach(function (id) {
+      document.getElementById(id).addEventListener('keydown', function (e) { if (e.key === 'Enter') tryLogin(); });
+    });
+  });
+  auth.onAuthStateChanged(function (user) { if (user) unlock(user.uid); });
 })();
 </script>
 <title>Anki Hype</title>
@@ -526,12 +544,8 @@ const Store = {
   async init() {
     let db = null, uid = null;
     try {
-      if (window.claude && window.claude.use) {
-        const timeout = new Promise(r => setTimeout(() => r([null, null]), 6000));
-        const both = Promise.all([window.claude.use('db'), window.claude.use('user')]);
-        const [d, u] = await Promise.race([both, timeout]);
-        db = d; if (u) uid = await u.id();
-      }
+      const auth = await window.__ankiReady;
+      if (auth) { db = auth.db; uid = auth.uid; }
     } catch (e) { db = null; }
     if (db && uid) {
       try {
